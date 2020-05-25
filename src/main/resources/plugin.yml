@@ -1,0 +1,18 @@
+main: io.github.bensku.sleeper.SleeperPlugin
+name: Sleeper
+version: 0.1
+description: Customize sleeping
+api-version: 1.14
+author: bensku
+
+depend: [ProtocolLib]
+
+commands:
+   sleep:
+      description: Toggles forced sleep for target player
+      permission: sleeper.admin
+      usage: /<command> [player]
+
+permissions:
+   sleeper.admin:
+      description: Admin commands
