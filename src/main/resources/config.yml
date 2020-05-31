@@ -1,0 +1,21 @@
+# Sleeper plugin configuration
+
+gameplay:
+   # Allow players to sleep anytime they want
+   sleep during day: false
+   
+workarounds:
+   # Try to make sure that sleeping players will not move, for any reason
+   deny sleeper movement: true
+   
+   # Prevent sleeping players from suffocating inside blocks
+   prevent suffocation: true
+   
+   # Server has hitboxes of sleeping players wrong
+   # On Spigot, this will remove projectiles that would hit them
+   # On Paper, projectiles will fully ignore them (this is better, use Paper)
+   protect sleepers from projectiles: true
+   
+   
+   
+   

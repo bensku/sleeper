@@ -3,9 +3,6 @@ package io.github.bensku.sleeper.filter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,11 +17,10 @@ import com.comphenix.protocol.events.ListenerPriority;
 import com.comphenix.protocol.events.PacketAdapter;
 import com.comphenix.protocol.events.PacketEvent;
 import com.comphenix.protocol.events.PacketListener;
-import com.comphenix.protocol.wrappers.BlockPosition;
 import com.comphenix.protocol.wrappers.WrappedDataWatcher;
-import com.comphenix.protocol.wrappers.WrappedWatchableObject;
 import com.comphenix.protocol.wrappers.WrappedDataWatcher.Registry;
 import com.comphenix.protocol.wrappers.WrappedDataWatcher.WrappedDataWatcherObject;
+import com.comphenix.protocol.wrappers.WrappedWatchableObject;
 
 import io.github.bensku.sleeper.SleepStatus;
 import io.github.bensku.sleeper.SleepTracker;
@@ -70,6 +66,11 @@ public class MetadataPacketFilter {
 		protocolManager.addPacketListener(packetListener);
 	}
 
+	/**
+	 * Forces an entity to be updated to all connected players. Use this after
+	 * changing sleep status to show changes.
+	 * @param entity Entity to update to players.
+	 */
 	public void forceUpdate(Entity entity) {
 		// Get entity flags (on fire, etc.)
 		Byte flags = WrappedDataWatcher.getEntityWatcher(entity).getByte(0);
@@ -99,6 +100,10 @@ public class MetadataPacketFilter {
 		}
 	}
 	
+	/**
+	 * Late initialization that we can't do before we have access to a
+	 * {@link Player}. Mostly deep reflection for NMS access.
+	 */
 	private void lateInit(Player player) throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException, InvocationTargetException, ClassNotFoundException {
 		Method getHandleMethod = player.getClass().getMethod("getHandle");
 		Object nmsPlayer = getHandleMethod.invoke(player);
@@ -112,12 +117,20 @@ public class MetadataPacketFilter {
 		poseSleeping = valueOf.invoke(null, "SLEEPING");
 	}
 
+	/**
+	 * Send packet handler used for injecting desired sleep status to entity
+	 * metadata packets.
+	 * @param event Packet event.
+	 */
 	private void onSendPacket(PacketEvent event) {
+		// Using PacketWrapper here (no need to look at Minecraft source)
 		WrapperPlayServerEntityMetadata packet = new WrapperPlayServerEntityMetadata(event.getPacket());
 		Entity entity = packet.getEntity(event);
 		if (!(entity instanceof Player)) {
 			return; // Only processing players here
 		}
+		
+		// Now that we have a player, do some late initialization (one time only)
 		Player player = (Player) entity;
 		if (poseSleeping == null) {
 			try {
@@ -136,7 +149,6 @@ public class MetadataPacketFilter {
 			// Remove bed position to actually wake up
 			bedPosObj = new WrappedWatchableObject(new WrappedDataWatcherObject(BED_POS_INDEX, Registry.getBlockPositionSerializer(true)), Optional.empty());
 		} else {
-			System.out.println("force-sleeping");
 			// Force pose to sleeping, no matter what it might've been before
 			poseObj = new WrappedWatchableObject(new WrappedDataWatcherObject(POSE_INDEX, Registry.get(poseEnum)), poseSleeping);
 			
@@ -151,6 +163,7 @@ public class MetadataPacketFilter {
 			}
 		}
 		
+		// Replace existing watchables for pose and bed position
 		List<WrappedWatchableObject> watchables = packet.getMetadata();
 		for (int i = 0; i < watchables.size(); i++) {
 			WrappedWatchableObject obj = watchables.get(i);
@@ -162,6 +175,7 @@ public class MetadataPacketFilter {
 				bedPosObj = null;
 			}
 		}
+		// Or if we didn't replace, add them to end
 		if (poseObj != null) {
 			watchables.add(poseObj);
 		}
@@ -169,6 +183,7 @@ public class MetadataPacketFilter {
 			watchables.add(bedPosObj);
 		}
 		
+		// Replace watchables in packet with our modified list
 		packet.getHandle().getWatchableCollectionModifier().write(0, watchables);
 	}
 }
